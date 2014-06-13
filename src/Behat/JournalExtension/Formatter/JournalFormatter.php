@@ -8,11 +8,14 @@ use Behat\Behat\Formatter\HtmlFormatter;
 use Behat\Gherkin\Node\StepNode;
 use Behat\JournalExtension\Formatter\Driver\DriverInterface;
 use Behat\Mink\Mink;
+use Behat\Behat\Event\StepEvent;
 
 class JournalFormatter extends HtmlFormatter
 {
     protected $driver;
     protected $captureAll;
+
+    private $screenShots = array();
 
     public function __construct(DriverInterface $driver, $captureAll)
     {
@@ -37,6 +40,34 @@ HTML
         parent::printSummary($logger);
     }
 
+    public function afterStep(StepEvent $event)
+    {
+        parent::afterStep($event);
+
+        $capture = $this->captureAll || $event->getResult()==StepEvent::FAILED;
+        if ($capture)
+        {
+            $this->takeScreenshot($event);
+        }
+    }
+
+    private function takeScreenshot($event)
+    {
+        $screenshot = $this->driver->getScreenshot();
+
+        $this->screenShots[$event->getStep()->getLine()] = $screenshot;
+    }
+
+    private function getScreenshot($step)
+    {
+        $key = $step->getLine();
+        if (array_key_exists($key, $this->screenShots))
+        {
+            return $this->screenShots[$key];
+        }
+        return false;
+    }
+
     protected function printStepBlock(StepNode $step, DefinitionInterface $definition = null, $color)
     {
         parent::printStepBlock($step, $definition, $color);
@@ -45,7 +76,7 @@ HTML
 
         if ($capture) {
             try {
-                $screenshot = $this->driver->getScreenshot();
+                $screenshot = $this->getScreenshot($step);
                 if ($screenshot) {
                     $this->writeln('<div class="screenshot">');
                     $this->writeln(sprintf('<a href="#" class="screenshot-toggler">Toggle screenshot</a>'));
